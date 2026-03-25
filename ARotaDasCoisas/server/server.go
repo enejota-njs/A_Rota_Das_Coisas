@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
@@ -68,12 +71,61 @@ func listenSensor() {
 func handleClient(conn net.Conn) {
 	defer conn.Close()
 
+	reader := bufio.NewReader(conn)
+
+	for {
+		option, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Cliente desconectou.")
+			return
+		}
+
+		option = strings.TrimSpace(option)
+
+		switch option {
+		case "1":
+			listSensors(conn)
+		case "2":
+			verifySensors(conn)
+		case "3":
+			selectSensor(conn)
+		}
+	}
+
+}
+
+func listenClient() {
+	listenerClient, err := net.Listen("tcp", ":8000")
+	if err != nil {
+		panic(err)
+	}
+	defer listenerClient.Close()
+
+	for {
+		connClient, err := listenerClient.Accept()
+		if err != nil {
+			fmt.Println("Erro no Accept:", err)
+			continue
+		}
+
+		fmt.Println("Cliente conectado.")
+		go handleClient(connClient)
+	}
+}
+
+func selectSensor(conn net.Conn) {
+	mu.Lock()
+	copySensors := maps.Clone(sensors)
+	mu.Unlock()
+
+	//Parei na função de seleção de um sensor específico.
+
+}
+
+func verifySensors(conn net.Conn) {
 	for {
 		mu.Lock()
-		copySensors := make(map[string]Sensor)
-		for k, v := range sensors {
-			copySensors[k] = v
-		}
+		copySensors := maps.Clone(sensors)
 		mu.Unlock()
 
 		for id, s := range copySensors {
@@ -97,22 +149,15 @@ func handleClient(conn net.Conn) {
 	}
 }
 
-func listenClient() {
-	listenerClient, err := net.Listen("tcp", ":8000")
-	if err != nil {
-		panic(err)
-	}
-	defer listenerClient.Close()
+func listSensors(conn net.Conn) {
+	mu.Lock()
+	copySensors := maps.Clone(sensors)
+	mu.Unlock()
 
-	for {
-		connClient, err := listenerClient.Accept()
-		if err != nil {
-			fmt.Println("Erro no Accept:", err)
-			continue
+	for id, s := range copySensors {
+		if s.Temperature != nil || s.Luminosity != nil || s.Humidity != nil {
+			fmt.Fprintf(conn, "%s\n", id)
 		}
-
-		fmt.Println("Cliente conectado.")
-		go handleClient(connClient)
 	}
 }
 
