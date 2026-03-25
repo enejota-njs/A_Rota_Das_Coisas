@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	conn, err := net.Dial("tcp", "localhost:8080")
+	conn, err := net.Dial("tcp", "localhost:8000")
 	if err != nil {
 		fmt.Println("Erro ao conectar: ", err)
 		return
@@ -25,6 +25,11 @@ func main() {
 			return
 		}
 
-		fmt.Println(values)
+		if values == "------\n" {
+			fmt.Print("\033[H\033[2J")
+			continue
+		}
+
+		fmt.Print(values)
 	}
 }
