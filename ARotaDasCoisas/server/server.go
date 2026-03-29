@@ -35,12 +35,6 @@ type Request struct {
 	Action string `json:"action"`
 }
 
-type Response struct {
-	Status string      `json:"status"`
-	Data   interface{} `json:"data"`
-	Error  string      `json:"error"`
-}
-
 var (
 	sensors = make(map[string]SensorHistory)
 	mu      sync.Mutex
@@ -197,45 +191,51 @@ func verifySensors(conn net.Conn) {
 }
 
 func selectSensor(conn net.Conn, request Request) {
-	mu.Lock()
-	copySensors := maps.Clone(sensors)
-	mu.Unlock()
+	for {
+		mu.Lock()
+		copySensors := maps.Clone(sensors)
+		mu.Unlock()
 
-	id := fmt.Sprintf("%s", request.ID)
+		current, ok := copySensors[request.ID]
+		if !ok {
+			json.NewEncoder(conn).Encode(ResponseSensor{
+				Status: "failed",
+				Error:  "Sensor não encontrado",
+			})
+			return
+		}
 
-	sensor, ok := copySensors[id]
-	if !ok {
-		json.NewEncoder(conn).Encode(Response{
-			Status: "failed",
-			Error:  "Sensor não encontrado",
-		})
-		return
+		sensor := Sensor{
+			ID: request.ID,
+		}
+
+		if len(current.Humidities) > 0 {
+			value := current.Humidities[len(current.Humidities)-1]
+			sensor.Humidity = &value
+		}
+
+		if len(current.Temperatures) > 0 {
+			value := current.Temperatures[len(current.Temperatures)-1]
+			sensor.Temperature = &value
+		}
+
+		if len(current.Luminosities) > 0 {
+			value := current.Luminosities[len(current.Luminosities)-1]
+			sensor.Luminosity = &value
+		}
+
+		responseSensor := ResponseSensor{
+			Status: "success",
+			Data:   sensor,
+		}
+
+		if err := json.NewEncoder(conn).Encode(responseSensor); err != nil {
+			fmt.Println("\nErro ao enviar resposta para o cliente: ", err)
+			return
+		}
+
+		time.Sleep(1 * time.Second)
 	}
-
-	var result Sensor
-	result.ID = id
-
-	if len(sensor.Humidities) > 0 {
-		value := sensor.Humidities[len(sensor.Humidities)-1]
-		result.Humidity = &value
-	}
-
-	if len(sensor.Temperatures) > 0 {
-		value := sensor.Temperatures[len(sensor.Temperatures)-1]
-		result.Temperature = &value
-	}
-
-	if len(sensor.Luminosities) > 0 {
-		value := sensor.Luminosities[len(sensor.Luminosities)-1]
-		result.Luminosity = &value
-	}
-
-	response := Response{
-		Status: "success",
-		Data:   result,
-	}
-
-	json.NewEncoder(conn).Encode(response)
 }
 
 func handleClient(conn net.Conn) {
