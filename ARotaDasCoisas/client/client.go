@@ -94,8 +94,6 @@ func main() {
 
 			decoder := json.NewDecoder(conn)
 
-			fmt.Println()
-
 			for {
 				var responseSensor ResponseSensor
 
@@ -115,10 +113,18 @@ func main() {
 
 				sensorResult := responseSensor.Data
 
-				fmt.Println(sensorResult.ID)
+				if sensorResult.Temperature != nil {
+					fmt.Printf("\nTemperatura (%s)", sensorResult.ID)
+				}
+				if sensorResult.Humidity != nil {
+					fmt.Printf("\nUmidade (%s)", sensorResult.ID)
+				}
+				if sensorResult.Luminosity != nil {
+					fmt.Printf("\nLuminosidade (%s)", sensorResult.ID)
+				}
 			}
 
-			fmt.Print("\nPressione ENTER para voltar ao menu.")
+			fmt.Print("\n\nPressione ENTER para voltar ao menu.")
 			fmt.Scanln()
 
 		case "2":
@@ -147,19 +153,18 @@ func main() {
 				}
 
 				if responseSensor.Status == "endOfRound" {
+					clearTerminal()
+					fmt.Println("\nSensores: ")
+
 					for _, sensor := range latest {
-						clearTerminal()
-
-						fmt.Println("\nSensores: ")
-
 						if sensor.Temperature != nil {
-							fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Temperature)
+							fmt.Printf("\nTemperatura (%s) = %d ", sensor.ID, *sensor.Temperature)
 						}
 						if sensor.Humidity != nil {
-							fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Humidity)
+							fmt.Printf("\nUmidade (%s) = %d ", sensor.ID, *sensor.Humidity)
 						}
 						if sensor.Luminosity != nil {
-							fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Luminosity)
+							fmt.Printf("\nLuminosidade (%s) = %d ", sensor.ID, *sensor.Luminosity)
 						}
 					}
 
@@ -178,7 +183,7 @@ func main() {
 			}
 
 		case "3":
-			fmt.Print("Digite o ID do sensor: ")
+			fmt.Print("\nDigite o ID do sensor: ")
 			id, _ := input.ReadString('\n')
 			id = strings.TrimSpace(id)
 
@@ -202,26 +207,32 @@ func main() {
 					return
 				}
 
+				if responseSensor.Status == "end" {
+					break
+				}
+
 				if responseSensor.Status == "error" {
 					fmt.Println("\nFalha: ", responseSensor.Error)
 					return
 				}
 
 				if responseSensor.Status == "success" {
-					fmt.Print("\033[H\033[2J")
+					clearTerminal()
+
 					sensor := responseSensor.Data
 
+					fmt.Println("\nSensor: ")
+
 					if sensor.Temperature != nil {
-						fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Temperature)
+						fmt.Printf("\nTemperatura (%s) = %d ", sensor.ID, *sensor.Temperature)
 					}
 					if sensor.Humidity != nil {
-						fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Humidity)
+						fmt.Printf("\nUmidade (%s) = %d ", sensor.ID, *sensor.Humidity)
 					}
 					if sensor.Luminosity != nil {
-						fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Luminosity)
+						fmt.Printf("\nLuminosidade (%s) = %d ", sensor.ID, *sensor.Luminosity)
 					}
 				}
-
 			}
 
 		case "7":
@@ -230,6 +241,9 @@ func main() {
 
 		default:
 			fmt.Println("\nOpção inválida.")
+
+			fmt.Print("\nPressione ENTER para voltar ao menu.")
+			fmt.Scanln()
 			continue
 		}
 	}

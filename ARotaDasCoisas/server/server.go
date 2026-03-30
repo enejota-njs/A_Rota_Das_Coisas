@@ -83,6 +83,19 @@ func listSensors(conn net.Conn) {
 			ID: id,
 		}
 
+		if len(s.Temperatures) > 0 {
+			v := s.Temperatures[len(s.Temperatures)-1]
+			sensor.Temperature = &v
+		}
+		if len(s.Humidities) > 0 {
+			v := s.Humidities[len(s.Humidities)-1]
+			sensor.Humidity = &v
+		}
+		if len(s.Luminosities) > 0 {
+			v := s.Luminosities[len(s.Luminosities)-1]
+			sensor.Luminosity = &v
+		}
+
 		responseSensor := ResponseSensor{
 			Status: "success",
 			Data:   sensor,
@@ -180,7 +193,20 @@ func verifySensors(conn net.Conn) {
 }
 
 func selectSensor(conn net.Conn, request Request) {
+	start := time.Now()
+
 	for {
+		if time.Since(start) >= 10*time.Second {
+			responseSensor := ResponseSensor{
+				Status: "end",
+			}
+
+			if err := json.NewEncoder(conn).Encode(responseSensor); err != nil {
+				fmt.Println("\nErro ao enviar resposta final para o cliente: ", err)
+			}
+			return
+		}
+
 		muSensor.Lock()
 		copySensors := maps.Clone(sensors)
 		muSensor.Unlock()
