@@ -5,8 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="1f2d9508-2ea3-43ca-b996-4434772a8a88" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ARotaDasCoisas/client/client.go" beforeDir="false" afterPath="$PROJECT_DIR$/ARotaDasCoisas/client/client.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ARotaDasCoisas/dataBase.json" beforeDir="false" afterPath="$PROJECT_DIR$/ARotaDasCoisas/dataBase.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ARotaDasCoisas/sensor/humidity/humidity.go" beforeDir="false" afterPath="$PROJECT_DIR$/ARotaDasCoisas/sensor/humidity/humidity.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ARotaDasCoisas/sensor/luminosity/luminosity.go" beforeDir="false" afterPath="$PROJECT_DIR$/ARotaDasCoisas/sensor/luminosity/luminosity.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ARotaDasCoisas/sensor/temperature/temperature.go" beforeDir="false" afterPath="$PROJECT_DIR$/ARotaDasCoisas/sensor/temperature/temperature.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ARotaDasCoisas/server/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/ARotaDasCoisas/server/server.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

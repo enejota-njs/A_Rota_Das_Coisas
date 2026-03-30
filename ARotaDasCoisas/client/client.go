@@ -84,7 +84,7 @@ func main() {
 		switch option {
 		case "1":
 			request = Request{
-				Action: "list",
+				Action: "listSensors",
 			}
 
 			if err := json.NewEncoder(conn).Encode(request); err != nil {
@@ -129,7 +129,7 @@ func main() {
 
 		case "2":
 			request = Request{
-				Action: "verify",
+				Action: "verifySensors",
 			}
 
 			if err := json.NewEncoder(conn).Encode(request); err != nil {
@@ -189,7 +189,7 @@ func main() {
 
 			request = Request{
 				ID:     id,
-				Action: "select",
+				Action: "selectSensor",
 			}
 
 			if err := json.NewEncoder(conn).Encode(request); err != nil {
@@ -234,6 +234,10 @@ func main() {
 					}
 				}
 			}
+		case "4":
+
+		case "5":
+		case "6":
 
 		case "7":
 			conn.Close()

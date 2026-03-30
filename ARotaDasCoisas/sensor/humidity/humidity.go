@@ -7,13 +7,16 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 )
 
 type Sensor struct {
-	ID       string `json:"id"`
-	Humidity int    `json:"humidity"`
+	ID    string `json:"id"`
+	Type  string `json:"type"`
+	Value int    `json:"value"`
 }
 
 func step(value int) int {
@@ -41,13 +44,13 @@ func main() {
 
 	humi := 40 + rand.Intn(11) // 40–50
 
-	fmt.Print("\033[H\033[2J")
+	clearTerminal()
 	fmt.Printf("\nSensor de umidade %s inicializado.\n", id)
 
 	for {
 		conn, err := net.Dial("udp", "127.0.0.1:7000")
 		if err != nil {
-			fmt.Println("Erro ao conectar o sensor de humidade: ", id, err)
+			fmt.Println("\nErro ao conectar o sensor de humidade: ", id, err)
 			continue
 		}
 
@@ -55,15 +58,16 @@ func main() {
 			humi = step(humi)
 
 			data := Sensor{
-				ID:       id,
-				Humidity: humi,
+				ID:    id,
+				Type:  "Umidade",
+				Value: humi,
 			}
 
 			values, _ := json.Marshal(data)
 
 			_, err := conn.Write(values)
 			if err != nil {
-				fmt.Println("Erro no envio do sensor de umidade: ", id, err)
+				fmt.Println("\nErro no envio do sensor de umidade: ", id, err)
 				conn.Close()
 				break
 			}
@@ -71,4 +75,17 @@ func main() {
 			time.Sleep(1 * time.Millisecond)
 		}
 	}
+}
+
+func clearTerminal() {
+	var cmd *exec.Cmd
+
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "cls")
+	} else {
+		cmd = exec.Command("clear")
+	}
+
+	cmd.Stdout = os.Stdout
+	cmd.Run()
 }
