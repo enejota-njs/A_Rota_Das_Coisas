@@ -6,8 +6,23 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 )
+
+func clearTerminal() {
+	var cmd *exec.Cmd
+
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "cls")
+	} else {
+		cmd = exec.Command("clear")
+	}
+
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+}
 
 type Request struct {
 	ID     string `json:"id"`
@@ -27,6 +42,7 @@ type Sensor struct {
 }
 
 func main() {
+	clearTerminal()
 	conn, err := net.Dial("tcp", "localhost:8000")
 	if err != nil {
 		fmt.Println("Erro ao conectar no servidor: ", err)
@@ -34,37 +50,34 @@ func main() {
 	}
 	defer conn.Close()
 
-	fmt.Println("\nConectado ao servidor.")
-
 	input := bufio.NewReader(os.Stdin)
 
 	for {
-		fmt.Println("|----------------------------|")
-		fmt.Println("|            MENU            |")
-		fmt.Println("|----------------------------|")
-		fmt.Println("|          SENSORES          |")
-		fmt.Println("|                            |")
-		fmt.Println("| [ 1 ] - Listar sensores    |")
-		fmt.Println("| [ 2 ] - Verificar sensores |")
-		fmt.Println("| [ 3 ] - Selecionar sensor  |")
-		fmt.Println("|                            |")
-		fmt.Println("|----------------------------|")
-		fmt.Println("|          ATUADORES         |")
-		fmt.Println("|                            |")
-		fmt.Println("| [ 4 ] - Listar atuadores   |")
-		fmt.Println("| [ 5 ] - Verificar atuadores|")
-		fmt.Println("| [ 6 ] - Selecionar atuador |")
-		fmt.Println("|                            |")
-		fmt.Println("|----------------------------|")
-		fmt.Println("| [ 7 ] - Fechar             |")
-		fmt.Println("|----------------------------|")
+		clearTerminal()
+		fmt.Println("\n|------------------------------|")
+		fmt.Println("|             MENU             |")
+		fmt.Println("|------------------------------|")
+		fmt.Println("|           SENSORES           |")
+		fmt.Println("|                              |")
+		fmt.Println("| [ 1 ] - Listar sensores      |")
+		fmt.Println("| [ 2 ] - Verificar sensores   |")
+		fmt.Println("| [ 3 ] - Selecionar sensor    |")
+		fmt.Println("|                              |")
+		fmt.Println("|------------------------------|")
+		fmt.Println("|           ATUADORES          |")
+		fmt.Println("|                              |")
+		fmt.Println("| [ 4 ] - Listar atuadores     |")
+		fmt.Println("| [ 5 ] - Verificar atuadores  |")
+		fmt.Println("| [ 6 ] - Selecionar atuador   |")
+		fmt.Println("|                              |")
+		fmt.Println("|------------------------------|")
+		fmt.Println("| [ 7 ] - Fechar               |")
+		fmt.Println("|------------------------------|")
 
 		fmt.Print("\nSelecione uma opção: ")
 
 		option, _ := input.ReadString('\n')
 		option = strings.TrimSpace(option)
-
-		fmt.Println("")
 
 		var request Request
 
@@ -76,17 +89,19 @@ func main() {
 
 			if err := json.NewEncoder(conn).Encode(request); err != nil {
 				fmt.Println("\nErro ao enviar requisição para o servidor: ", err)
-				return
+				continue
 			}
 
 			decoder := json.NewDecoder(conn)
+
+			fmt.Println()
 
 			for {
 				var responseSensor ResponseSensor
 
 				if err := decoder.Decode(&responseSensor); err != nil {
-					fmt.Println("\nErro ao receber resposta do servidor: ", err)
-					return
+					fmt.Println("Erro ao receber resposta do servidor: ", err)
+					break
 				}
 
 				if responseSensor.Status == "end" {
@@ -94,14 +109,17 @@ func main() {
 				}
 
 				if responseSensor.Status != "success" {
-					fmt.Println("\nFalha: ", responseSensor.Error)
-					return
+					fmt.Println("Erro: ", responseSensor.Error)
+					break
 				}
 
 				sensorResult := responseSensor.Data
 
 				fmt.Println(sensorResult.ID)
 			}
+
+			fmt.Print("\nPressione ENTER para voltar ao menu.")
+			fmt.Scanln()
 
 		case "2":
 			request = Request{
@@ -110,7 +128,7 @@ func main() {
 
 			if err := json.NewEncoder(conn).Encode(request); err != nil {
 				fmt.Println("\nErro ao enviar requisição para o servidor: ", err)
-				return
+				continue
 			}
 
 			decoder := json.NewDecoder(conn)
@@ -121,13 +139,19 @@ func main() {
 
 				if err := decoder.Decode(&responseSensor); err != nil {
 					fmt.Println("\nErro ao receber resposta do servidor: ", err)
-					return
+					break
+				}
+
+				if responseSensor.Status == "end" {
+					break
 				}
 
 				if responseSensor.Status == "endOfRound" {
-					fmt.Print("\033[H\033[2J")
-
 					for _, sensor := range latest {
+						clearTerminal()
+
+						fmt.Println("\nSensores: ")
+
 						if sensor.Temperature != nil {
 							fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Temperature)
 						}
@@ -142,13 +166,15 @@ func main() {
 					continue
 				}
 
-				if responseSensor.Status == "sucess" {
+				if responseSensor.Status == "error" {
 					fmt.Println("\nFalha: ", responseSensor.Error)
-					return
+					break
 				}
 
-				sensorResult := responseSensor.Data
-				latest[sensorResult.ID] = sensorResult
+				if responseSensor.Status == "success" {
+					sensorResult := responseSensor.Data
+					latest[sensorResult.ID] = sensorResult
+				}
 			}
 
 		case "3":
@@ -176,27 +202,34 @@ func main() {
 					return
 				}
 
-				if responseSensor.Status != "success" {
+				if responseSensor.Status == "error" {
 					fmt.Println("\nFalha: ", responseSensor.Error)
 					return
 				}
 
-				fmt.Print("\033[H\033[2J")
-				sensor := responseSensor.Data
+				if responseSensor.Status == "success" {
+					fmt.Print("\033[H\033[2J")
+					sensor := responseSensor.Data
 
-				if sensor.Temperature != nil {
-					fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Temperature)
+					if sensor.Temperature != nil {
+						fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Temperature)
+					}
+					if sensor.Humidity != nil {
+						fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Humidity)
+					}
+					if sensor.Luminosity != nil {
+						fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Luminosity)
+					}
 				}
-				if sensor.Humidity != nil {
-					fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Humidity)
-				}
-				if sensor.Luminosity != nil {
-					fmt.Printf("\n%s = %d ", sensor.ID, *sensor.Luminosity)
-				}
+
 			}
 
+		case "7":
+			conn.Close()
+			return
+
 		default:
-			fmt.Println("Opção inválida.")
+			fmt.Println("\nOpção inválida.")
 			continue
 		}
 	}

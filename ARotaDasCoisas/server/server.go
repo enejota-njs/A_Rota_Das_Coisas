@@ -58,6 +58,20 @@ func listSensors(conn net.Conn) {
 	copySensors := maps.Clone(sensors)
 	muSensor.Unlock()
 
+	if len(copySensors) == 0 {
+		responseSensor := ResponseSensor{
+			Status: "error",
+			Error:  "Lista de sensores vazia",
+		}
+
+		if err := json.NewEncoder(conn).Encode(responseSensor); err != nil {
+			fmt.Println("\nErro ao enviar resposta para o cliente: ", err)
+			return
+		}
+
+		return
+	}
+
 	for id, s := range copySensors {
 		if len(s.Temperatures) == 0 &&
 			len(s.Luminosities) == 0 &&
@@ -91,10 +105,37 @@ func listSensors(conn net.Conn) {
 }
 
 func verifySensors(conn net.Conn) {
+	start := time.Now()
+
 	for {
+		if time.Since(start) >= 10*time.Second {
+			responseSensor := ResponseSensor{
+				Status: "end",
+			}
+
+			if err := json.NewEncoder(conn).Encode(responseSensor); err != nil {
+				fmt.Println("\nErro ao enviar resposta final para o cliente: ", err)
+			}
+			return
+		}
+
 		muSensor.Lock()
 		copySensors := maps.Clone(sensors)
 		muSensor.Unlock()
+
+		if len(copySensors) == 0 {
+			responseSensor := ResponseSensor{
+				Status: "error",
+				Error:  "Lista de sensores vazia",
+			}
+
+			if err := json.NewEncoder(conn).Encode(responseSensor); err != nil {
+				fmt.Println("\nErro ao enviar resposta para o cliente: ", err)
+				return
+			}
+
+			return
+		}
 
 		for id, s := range copySensors {
 			sensor := Sensor{
@@ -147,7 +188,7 @@ func selectSensor(conn net.Conn, request Request) {
 		current, ok := copySensors[request.ID]
 		if !ok {
 			json.NewEncoder(conn).Encode(ResponseSensor{
-				Status: "failed",
+				Status: "error",
 				Error:  "Sensor não encontrado",
 			})
 			return
