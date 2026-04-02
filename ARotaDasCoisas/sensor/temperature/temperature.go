@@ -37,6 +37,7 @@ func step(value int) int {
 }
 
 func main() {
+	clearTerminal()
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("\nDigite o ID do sensor de temperatura: ")
 	id, _ := reader.ReadString('\n')

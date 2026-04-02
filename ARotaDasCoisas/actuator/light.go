@@ -36,7 +36,7 @@ func clearTerminal() {
 	cmd.Run()
 }
 
-func listenServer(actuator Actuator, conn net.Conn) {
+func listenServer(actuator *Actuator, conn net.Conn) {
 	decoder := json.NewDecoder(conn)
 	request := Request{}
 
@@ -80,7 +80,7 @@ func main() {
 		return
 	}
 
-	go listenServer(actuator, conn)
+	go listenServer(&actuator, conn)
 
 	var on string
 	for {

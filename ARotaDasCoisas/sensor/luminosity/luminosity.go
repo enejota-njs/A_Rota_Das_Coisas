@@ -55,24 +55,32 @@ func main() {
 			continue
 		}
 
+		counter := 0
+
 		for {
 			lumi = step(lumi)
 
-			data := Sensor{
-				ID:    id,
-				Type:  "Luminosidade",
-				Value: lumi,
+			if counter >= 1000 {
+				data := Sensor{
+					ID:    id,
+					Type:  "Luminosidade",
+					Value: lumi,
+				}
+
+				values, _ := json.Marshal(data)
+
+				_, err := conn.Write(values)
+				if err != nil {
+					fmt.Println("\nErro no envio do sensor de luminosidade: ", id, err)
+					conn.Close()
+					break
+				}
+
+				fmt.Println(lumi)
+				counter = 0
 			}
 
-			values, _ := json.Marshal(data)
-
-			_, err := conn.Write(values)
-			if err != nil {
-				fmt.Println("\nErro no envio do sensor de luminosidade: ", id, err)
-				conn.Close()
-				break
-			}
-
+			counter++
 			time.Sleep(1 * time.Millisecond)
 		}
 	}

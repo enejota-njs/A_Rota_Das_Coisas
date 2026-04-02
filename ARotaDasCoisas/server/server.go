@@ -128,7 +128,7 @@ func sendActuatorCommand(id, command string) {
 	muActuator.Unlock()
 
 	if !ok {
-		fmt.Println("\nAtuador não encontrado")
+		fmt.Printf("\nAtuador do sensor (%d) não encontrado", id)
 		return
 	}
 
@@ -199,7 +199,7 @@ func handleActuator(conn net.Conn) {
 	}
 	muActuator.Unlock()
 
-	fmt.Printf("\nAtuador registrado: %s (%s)", actuator.Type, actuator.ID)
+	fmt.Printf("\nAtuador registrado: %s (%s)\n", actuator.Type, actuator.ID)
 } // Finalizada
 
 func listenActuator() {
@@ -420,6 +420,3 @@ func main() {
 
 	select {}
 }
-
-/* Terminando a função do atuador, parece ser bom mudar as funções de request e response pra criar o encoder e decoder dentro dele mesmo, e verificar porque que tá passando o decoder da função request por ponteiro. Parei na função sendActuatorCommand.
- */
