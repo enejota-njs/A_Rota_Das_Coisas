@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -15,14 +17,26 @@ type Request struct {
 	Action string `json:"action"`
 }
 type Actuator struct {
-	ID   string `json:"id"`
-	On   bool   `json:"on"`
-	Type string `json:"type"`
+	Conn net.Conn `json:conn`
+	ID   string   `json:"id"`
+	Type string   `json:"type"`
+	On   bool     `json:"on"`
 }
 
-var light Actuator
+func clearTerminal() {
+	var cmd *exec.Cmd
 
-func listenServer(conn net.Conn) {
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "cls")
+	} else {
+		cmd = exec.Command("clear")
+	}
+
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+}
+
+func listenServer(actuator Actuator, conn net.Conn) {
 	decoder := json.NewDecoder(conn)
 	request := Request{}
 
@@ -33,10 +47,10 @@ func listenServer(conn net.Conn) {
 		}
 
 		if request.Action == "on" {
-			light.On = true
+			actuator.On = true
 		}
 		if request.Action == "off" {
-			light.On = false
+			actuator.On = false
 		}
 	}
 }
@@ -47,7 +61,7 @@ func main() {
 	id, _ := reader.ReadString('\n')
 	id = strings.TrimSpace(id)
 
-	conn, err := net.Dial("tcp", "localhost:9000")
+	conn, err := net.Dial("tcp", "127.0.0.1:9000")
 	if err != nil {
 		fmt.Println("Erro ao conectar no servidor: ", err)
 		return
@@ -66,23 +80,20 @@ func main() {
 		return
 	}
 
-	light.ID = id
-	light.Type = "Light"
-
-	go listenServer(conn)
+	go listenServer(actuator, conn)
 
 	var on string
 	for {
-		fmt.Print("\033[H\033[2J")
+		clearTerminal()
 
-		if !light.On {
+		if !actuator.On {
 			on = "Desligado"
 		}
-		if light.On {
+		if actuator.On {
 			on = "Ligado"
 		}
 
-		fmt.Printf("%s (%s) = %s", light.Type, light.ID, on)
+		fmt.Printf("%s (%s) = %s", actuator.Type, actuator.ID, on)
 		time.Sleep(1 * time.Second)
 	}
 }

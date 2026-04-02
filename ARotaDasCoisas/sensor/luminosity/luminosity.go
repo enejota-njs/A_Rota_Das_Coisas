@@ -7,13 +7,16 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 )
 
 type Sensor struct {
-	ID         string `json:"id"`
-	Luminosity int    `json:"luminosity"`
+	ID    string `json:"id"`
+	Type  string `json:"type"`
+	Value int    `json:"value"`
 }
 
 func step(value int) int {
@@ -34,6 +37,7 @@ func step(value int) int {
 }
 
 func main() {
+	clearTerminal()
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("\nDigite o ID do sensor luminosidade: ")
 	id, _ := reader.ReadString('\n')
@@ -41,13 +45,13 @@ func main() {
 
 	lumi := rand.Intn(101)
 
-	fmt.Print("\033[H\033[2J")
+	clearTerminal()
 	fmt.Printf("\nSensor de luminosidade %s inicializado.\n", id)
 
 	for {
 		conn, err := net.Dial("udp", "127.0.0.1:7000")
 		if err != nil {
-			fmt.Println("Erro ao conectar o sensor de luminosidade: ", id, err)
+			fmt.Println("\nErro ao conectar o sensor de luminosidade: ", id, err)
 			continue
 		}
 
@@ -55,15 +59,16 @@ func main() {
 			lumi = step(lumi)
 
 			data := Sensor{
-				ID:         id,
-				Luminosity: lumi,
+				ID:    id,
+				Type:  "Luminosidade",
+				Value: lumi,
 			}
 
 			values, _ := json.Marshal(data)
 
 			_, err := conn.Write(values)
 			if err != nil {
-				fmt.Println("Erro no envio do sensor de luminosidade: ", id, err)
+				fmt.Println("\nErro no envio do sensor de luminosidade: ", id, err)
 				conn.Close()
 				break
 			}
@@ -71,4 +76,17 @@ func main() {
 			time.Sleep(1 * time.Millisecond)
 		}
 	}
+}
+
+func clearTerminal() {
+	var cmd *exec.Cmd
+
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "cls")
+	} else {
+		cmd = exec.Command("clear")
+	}
+
+	cmd.Stdout = os.Stdout
+	cmd.Run()
 }
