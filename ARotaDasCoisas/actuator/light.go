@@ -8,15 +8,21 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 )
 
+type Response struct {
+	Status string `json:"status"`
+	Error  string `json:"error"`
+}
 type Request struct {
 	ID     string `json:"id"`
 	Action string `json:"action"`
 }
 type Actuator struct {
-	Conn net.Conn `json:conn`
+	Conn net.Conn `json:"-"`
 	ID   string   `json:"id"`
 	Type string   `json:"type"`
 	On   bool     `json:"on"`
@@ -35,28 +41,72 @@ func clearTerminal() {
 	cmd.Run()
 }
 
+func readId(reader *bufio.Reader) string {
+	for {
+		clearTerminal()
+		fmt.Print("\nDigite o ID da lâmpada: ")
+		idStr, _ := reader.ReadString('\n')
+		idStr = strings.TrimSpace(idStr)
+
+		_, err := strconv.Atoi(idStr)
+		if err != nil {
+			fmt.Println("\nDigite apenas números")
+			reader = bufio.NewReader(os.Stdin)
+			fmt.Println("\nPressione ENTER para tentar novamente")
+			reader.ReadString('\n')
+			continue
+		}
+
+		return idStr
+	}
+}
+
 func main() {
-	clearTerminal()
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("\nDigite o ID da lâmpada: ")
-	id, _ := reader.ReadString('\n')
-	id = strings.TrimSpace(id)
+	id := readId(reader)
 
-	conn, err := net.Dial("tcp", "127.0.0.1:9000")
-	if err != nil {
-		fmt.Println("Erro ao conectar no servidor: ", err)
-		return
-	}
-	defer conn.Close()
+	var actuator Actuator
+	var conn net.Conn
+	var err error
 
-	actuator := Actuator{
-		ID:   id,
-		Type: "Light",
-	}
+	for {
+		conn, err = net.Dial("tcp", "127.0.0.1:9000")
+		if err != nil {
+			fmt.Println("\nErro ao conectar no servidor: ", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
 
-	if err := json.NewEncoder(conn).Encode(actuator); err != nil {
-		fmt.Println("\nErro ao cadastrar atuador: ", err)
-		return
+		actuator = Actuator{
+			ID:   id,
+			Type: "Light",
+		}
+
+		if err = json.NewEncoder(conn).Encode(actuator); err != nil {
+			fmt.Println("\nErro ao cadastrar atuador: ", err)
+			conn.Close()
+			continue
+		}
+
+		var response Response
+		if err = json.NewDecoder(conn).Decode(&response); err != nil {
+			fmt.Println("\nErro na resposta do servidor: ", err)
+			conn.Close()
+			continue
+		}
+
+		if response.Status == "error" {
+			fmt.Println("\n", response.Error)
+			fmt.Println("\nPressione ENTER para tentar novamente")
+			reader.ReadString('\n')
+			id = readId(reader)
+			conn.Close()
+			continue
+		}
+
+		if response.Status == "success" {
+			break
+		}
 	}
 
 	var on string
@@ -76,7 +126,7 @@ func main() {
 	request := Request{}
 
 	for {
-		if err := decoder.Decode(&request); err != nil {
+		if err = decoder.Decode(&request); err != nil {
 			clearTerminal()
 			fmt.Println("\nDesconectado ao servidor")
 			return
@@ -101,4 +151,6 @@ func main() {
 
 		fmt.Printf("\n- %s (%s) = %s", actuator.Type, actuator.ID, on)
 	}
+
+	conn.Close()
 }

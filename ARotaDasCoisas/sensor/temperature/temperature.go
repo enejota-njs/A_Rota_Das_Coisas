@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,6 +18,11 @@ type Sensor struct {
 	ID    string `json:"id"`
 	Type  string `json:"type"`
 	Value int    `json:"value"`
+}
+
+type Response struct {
+	Status string `json:"status"`
+	Error  string `json:"error"`
 }
 
 func step(value int) int {
@@ -36,13 +42,31 @@ func step(value int) int {
 	return value
 }
 
+func readId(reader *bufio.Reader) string {
+	for {
+		clearTerminal()
+		fmt.Print("\nDigite o ID do sensor de temperatura: ")
+		idStr, _ := reader.ReadString('\n')
+		idStr = strings.TrimSpace(idStr)
+
+		_, err := strconv.Atoi(idStr)
+		if err != nil {
+			fmt.Println("\nDigite apenas números")
+			reader = bufio.NewReader(os.Stdin)
+			fmt.Println("\nPressione ENTER para tentar novamente")
+			reader.ReadString('\n')
+			continue
+		}
+
+		return idStr
+	}
+}
+
 func main() {
 	clearTerminal()
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("\nDigite o ID do sensor de temperatura: ")
-	id, _ := reader.ReadString('\n')
-	id = strings.TrimSpace(id)
 
+	reader := bufio.NewReader(os.Stdin)
+	id := readId(reader)
 	temp := rand.Intn(61) - 10
 
 	clearTerminal()
@@ -51,28 +75,62 @@ func main() {
 	for {
 		conn, err := net.Dial("udp", "127.0.0.1:7000")
 		if err != nil {
-			fmt.Println("\nErro ao conectar o sensor de temperatura: ", id, err)
 			continue
 		}
+
+		counter := 0
 
 		for {
 			temp = step(temp)
 
-			data := Sensor{
-				ID:    id,
-				Type:  "Temperatura",
-				Value: temp,
+			if counter >= 1000 {
+				data := Sensor{
+					ID:    id,
+					Type:  "Temperatura",
+					Value: temp,
+				}
+
+				values, _ := json.Marshal(data)
+
+				_, err := conn.Write(values)
+				if err != nil {
+					fmt.Println("\nErro no envio do sensor de temperatura: ", id, err)
+					conn.Close()
+					break
+				}
+
+				buffer := make([]byte, 1024)
+				conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+
+				n, err := conn.Read(buffer)
+				if err != nil {
+					fmt.Println("\nServidor não respondeu:", err)
+					conn.Close()
+					break
+				}
+
+				var response Response
+				if err := json.Unmarshal(buffer[:n], &response); err != nil {
+					fmt.Println("\nErro ao decodificar resposta:", err)
+					break
+				}
+
+				if response.Status == "error" {
+					fmt.Println("\n", response.Error)
+					fmt.Println("\nPressione ENTER para informar outro ID")
+					reader.ReadString('\n')
+					id = readId(reader)
+					clearTerminal()
+					fmt.Printf("\nSensor de temperatura %s inicializado.\n", id)
+					counter = 0
+					continue
+				}
+
+				fmt.Println(temp)
+				counter = 0
 			}
 
-			values, _ := json.Marshal(data)
-
-			_, err := conn.Write(values)
-			if err != nil {
-				fmt.Println("\nErro no envio do sensor de temperatura: ", id, err)
-				conn.Close()
-				break
-			}
-
+			counter++
 			time.Sleep(1 * time.Millisecond)
 		}
 	}

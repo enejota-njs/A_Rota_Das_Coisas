@@ -66,6 +66,20 @@ func clearTerminal() {
 
 // == SERVER
 
+func isCompatible(sensorType, actuatorType string) bool {
+	compat := map[string]string{
+		"Luminosidade": "Light",
+		"Umidade":      "Irrigator",
+		"Temperatura":  "Cooler",
+	}
+
+	expectedActuator, ok := compat[sensorType]
+	if !ok {
+		return false
+	}
+	return actuatorType == expectedActuator
+}
+
 func receiveRequest(decoder *json.Decoder, request *Request) error {
 	if err := decoder.Decode(request); err != nil {
 		fmt.Println("\nCliente desconectado: ", err)
@@ -186,15 +200,15 @@ func actuatorControl() {
 				}
 			case "Umidade":
 				if sensor.Value >= 70 {
-					_ = sendActuatorCommand(id, "off")
+					_ = sendActuatorCommand(sensor.ID, "off")
 				} else {
-					_ = sendActuatorCommand(id, "on")
+					_ = sendActuatorCommand(sensor.ID, "on")
 				}
 			case "Temperatura":
 				if sensor.Value >= 20 {
-					_ = sendActuatorCommand(id, "on")
+					_ = sendActuatorCommand(sensor.ID, "on")
 				} else {
-					_ = sendActuatorCommand(id, "off")
+					_ = sendActuatorCommand(sensor.ID, "off")
 				}
 			}
 
@@ -470,7 +484,49 @@ func handleActuator(conn net.Conn) {
 		return
 	}
 
+	muSensor.Lock()
+	sensor, sensorExists := sensors[actuator.ID]
+	muSensor.Unlock()
+
 	muActuator.Lock()
+	_, actuatorExists := actuators[actuator.ID]
+
+	if actuatorExists {
+		muActuator.Unlock()
+		fmt.Println("\nAtuador já existe")
+
+		response := Response{
+			Status: "error",
+			Error:  "Atuador já existe",
+		}
+
+		if err := json.NewEncoder(conn).Encode(response); err != nil {
+			fmt.Println("\nErro ao enviar resposta ao atuador: ", err)
+		}
+
+		conn.Close()
+		return
+	}
+
+	if sensorExists && !isCompatible(sensor.Type, actuator.Type) {
+		muActuator.Unlock()
+		fmt.Printf("\nErro: atuador %s (%s) incompatível com sensor (%s)\n",
+			actuator.ID, actuator.Type, sensor.Type)
+
+		response := Response{
+			Status: "error",
+			Error:  "Atuador incompatível com o sensor",
+		}
+
+		if err := json.NewEncoder(conn).Encode(response); err != nil {
+			fmt.Println("\nErro ao enviar resposta ao atuador: ", err)
+
+		}
+
+		conn.Close()
+		return
+	}
+
 	actuators[actuator.ID] = ActuatorConn{
 		Conn: conn,
 		ID:   actuator.ID,
@@ -481,14 +537,23 @@ func handleActuator(conn net.Conn) {
 
 	fmt.Printf("\nAtuador registrado: %s (%s)\n", actuator.Type, actuator.ID)
 
+	response := Response{
+		Status: "success",
+	}
+
+	if err := json.NewEncoder(conn).Encode(response); err != nil {
+		fmt.Println("\nErro ao enviar resposta ao atuador: ", err)
+		conn.Close()
+	}
+
 	go func(id string, c net.Conn) {
 		defer c.Close()
 
-		decoder := json.NewDecoder(c)
+		dec := json.NewDecoder(c)
 		var message map[string]any
 
 		for {
-			if err := decoder.Decode(&message); err != nil {
+			if err := dec.Decode(&message); err != nil {
 				muActuator.Lock()
 				a, ok := actuators[id]
 				if ok && a.Conn == c {
@@ -525,15 +590,15 @@ func listenActuator() {
 func listenSensor() {
 	bufferSensors := make([]byte, 1024)
 
-	connSensor, err := net.ListenPacket("udp", "127.0.0.1:7000")
+	conn, err := net.ListenPacket("udp", "127.0.0.1:7000")
 	if err != nil {
 		fmt.Println("\nErro ao iniciar servidor UDP:", err)
 		return
 	}
-	defer connSensor.Close()
+	defer conn.Close()
 
 	for {
-		n, _, err := connSensor.ReadFrom(bufferSensors)
+		n, addr, err := conn.ReadFrom(bufferSensors)
 		if err != nil {
 			fmt.Println("\nErro ao se comunicar com sensor: ", err)
 			continue
@@ -547,8 +612,56 @@ func listenSensor() {
 		}
 
 		muSensor.Lock()
+		oldSensor, sensorExists := sensors[received.ID]
+
+		muActuator.Lock()
+		actuator, actuatorExists := actuators[received.ID]
+
+		if sensorExists && oldSensor.Type != received.Type {
+			muActuator.Unlock()
+			muSensor.Unlock()
+
+			fmt.Printf("\nSensor (%s) já existe e é de outro modelo (%s)\n", received.ID, oldSensor.Type)
+
+			response := Response{
+				Status: "error",
+				Error:  "Sensor já existe e é de outro modelo",
+			}
+			if b, err := json.Marshal(response); err == nil {
+				_, _ = conn.WriteTo(b, addr)
+			}
+			continue
+		}
+
+		if actuatorExists && !isCompatible(received.Type, actuator.Type) {
+			muActuator.Unlock()
+			muSensor.Unlock()
+
+			fmt.Printf("\nSensor (%s) incompatível com atuador (%s)\n",
+				received.ID, actuator.Type)
+
+			response := Response{
+				Status: "error",
+				Error:  "Sensor incompatível com atuador",
+			}
+			if b, err := json.Marshal(response); err == nil {
+				_, _ = conn.WriteTo(b, addr)
+			}
+			continue
+		}
+
+		response := Response{
+			Status: "success",
+		}
+		if b, err := json.Marshal(response); err == nil {
+			_, _ = conn.WriteTo(b, addr)
+		}
+
 		sensors[received.ID] = received
+
+		muActuator.Unlock()
 		muSensor.Unlock()
+
 	}
 }
 
@@ -627,3 +740,8 @@ func main() {
 
 	select {}
 }
+
+// No módulo do atuador, verificar como que tá a fiscalização, acho que só fiscaliza da primeira vez
+// No módulo do servidor ver se tá correto e falta enviar o sucess para o atuador
+// Não lembro se tem coisa do cliente pra fazer, acho que não
+// Dá ultima vez que testei, quando inscrevo um servidor trava tudo, além disso o ID tá printando vazio no servidor
