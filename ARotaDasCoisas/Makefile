@@ -1,9 +1,8 @@
-# Windows + Go
 GO=go
-BIN_EXT=.exe
+BIN_EXT=
 
 build: build-server build-client build-sensors build-actuators
-	@echo Build completo.
+	@echo "Build completo"
 
 build-server:
 	$(GO) build -o server/server$(BIN_EXT) server/server.go
@@ -25,5 +24,44 @@ build-actuators:
 	$(GO) build -o actuator/light/light$(BIN_EXT) actuator/light/light.go
 	$(GO) build -o actuator/sprinkler/sprinkler$(BIN_EXT) actuator/sprinkler/sprinkler.go
 
+run-server:
+	gnome-terminal -- bash -c "go run server/server.go; exec bash"
+
+run-client:
+	gnome-terminal -- bash -c "go run client/client.go; exec bash"
+
+run-sensors:
+	gnome-terminal -- bash -c "go run sensor/gas/gas.go; exec bash"
+	gnome-terminal -- bash -c "go run sensor/humidity/humidity.go; exec bash"
+	gnome-terminal -- bash -c "go run sensor/luminosity/luminosity.go; exec bash"
+	gnome-terminal -- bash -c "go run sensor/smoke/smoke.go; exec bash"
+	gnome-terminal -- bash -c "go run sensor/temperature/temperature.go; exec bash"
+
+run-actuators:
+	gnome-terminal -- bash -c "go run actuator/airConditioner/airConditioner.go; exec bash"
+	gnome-terminal -- bash -c "go run actuator/exhaustFan/exhaustFan.go; exec bash"
+	gnome-terminal -- bash -c "go run actuator/humidifier/humidifier.go; exec bash"
+	gnome-terminal -- bash -c "go run actuator/light/light.go; exec bash"
+	gnome-terminal -- bash -c "go run actuator/sprinkler/sprinkler.go; exec bash"
+
+run-all: run-server
+	@sleep 1
+	$(MAKE) run-client
+	$(MAKE) run-sensors
+	$(MAKE) run-actuators
+
+build-and-run: build run-all
+
 clean:
-	del /Q server\*.exe client\*.exe sensor\gas\*.exe sensor\humidity\*.exe sensor\luminosity\*.exe sensor\smoke\*.exe sensor\temperature\*.exe actuator\airConditioner\*.exe actuator\exhaustFan\*.exe actuator\humidifier\*.exe actuator\light\*.exe actuator\sprinkler\*.exe 2>nul || exit 0
+	rm -f server/server server/server.exe client/client client/client.exe \
+		sensor/gas/gas sensor/gas/gas.exe \
+		sensor/humidity/humidity sensor/humidity/humidity.exe \
+		sensor/luminosity/luminosity sensor/luminosity/luminosity.exe \
+		sensor/smoke/smoke sensor/smoke/smoke.exe \
+		sensor/temperature/temperature sensor/temperature/temperature.exe \
+		actuator/airConditioner/airConditioner actuator/airConditioner/airConditioner.exe \
+		actuator/exhaustFan/exhaustFan actuator/exhaustFan/exhaustFan.exe \
+		actuator/humidifier/humidifier actuator/humidifier/humidifier.exe \
+		actuator/light/light actuator/light/light.exe \
+		actuator/sprinkler/sprinkler actuator/sprinkler/sprinkler.exe
+	@echo "Limpeza concluída"
